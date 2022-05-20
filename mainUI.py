@@ -39,7 +39,7 @@ class Window:
         self.img_dir = "/Users/travis/UniversityFiles/GraduationFiles/plateDataDir"
         self.net_img_dir = "http://localhost:8089/imgdir"
         self.unet = keras.models.load_model('model/unetnew.h5')
-        self.cnn = keras.models.load_model('model/cnn.h5')
+        self.cnn = keras.models.load_model('model/cnnblue57.h5')
         self.cnngreen = keras.models.load_model('model/cnngreen317.h5')
         self.cnnyellow = keras.models.load_model('model/cnnyellow326.h5')
         print('正在启动中,请稍等...')

@@ -1,8 +1,7 @@
 # -*- coding:utf-8 -*-
-import os.path
 import sys
-# from tkinter import *
-# from tkinter.filedialog import askopenfilename
+from tkinter import *
+from tkinter.filedialog import askopenfilename
 from PIL import ImageTk
 from tensorflow import keras
 from utils.locate_and_correct import *
@@ -11,157 +10,183 @@ from unet import *
 from cnn_utils.cnn import *
 from cnn_utils.cnngreen import *
 from cnn_utils.cnnyellow import *
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-import time
-from dbHandle import *
 
-
-class MyDirEventHandler(FileSystemEventHandler):
-    def __init__(self):
-        self.window = Window()
-
-    def on_created(self, event):
-        print(event)
-        listevent = event.src_path.split('/')
-        orgid = listevent[len(listevent)-2]
-        # print(orgid)
-        fileName = str(event.src_path.split('/')[-1])
-        # print(fileName)
-        if fileName != ".DS_Store":
-            if orgid.find('_') == -1:
-                self.window.predict_func(fileName, orgid)
-            else:
-                self.window.predict_func_leave(fileName, orgid)
 
 class Window:
-    def __init__(self):
-        self.img_dir = "/Users/travis/UniversityFiles/GraduationFiles/plateDataDir"
-        self.net_img_dir = "http://localhost:8089/imgdir"
-        self.unet = keras.models.load_model('model/unetnew.h5')
-        self.cnn = keras.models.load_model('model/cnn.h5')
+    def __init__(self, win, ww, wh):
+        self.win = win
+        self.ww = ww
+        self.wh = wh
+        self.win.geometry("%dx%d+%d+%d" % (ww, wh, 200, 50))  # 界面启动时的初始位置
+        self.win.title("测试界面")
+        self.img_src_path = None
+
+        self.label_src = Label(self.win, text='原图:', font=('微软雅黑', 13)).place(x=0, y=0)
+        self.label_lic1 = Label(self.win, text='车牌区域:', font=('微软雅黑', 13)).place(x=615, y=180)
+        self.label_pred1 = Label(self.win, text='识别结果:', font=('微软雅黑', 13)).place(x=615, y=300)
+        # self.label_lic1 = Label(self.win, text='车牌区域1:', font=('微软雅黑', 13)).place(x=615, y=0)
+        # self.label_pred1 = Label(self.win, text='识别结果1:', font=('微软雅黑', 13)).place(x=615, y=85)
+        # self.label_lic2 = Label(self.win, text='车牌区域2:', font=('微软雅黑', 13)).place(x=615, y=180)
+        # self.label_pred2 = Label(self.win, text='识别结果2:', font=('微软雅黑', 13)).place(x=615, y=265)
+        # self.label_lic3 = Label(self.win, text='车牌区域3:', font=('微软雅黑', 13)).place(x=615, y=360)
+        # self.label_pred3 = Label(self.win, text='识别结果3:', font=('微软雅黑', 13)).place(x=615, y=445)
+
+        self.can_src = Canvas(self.win, width=512, height=512, bg='white', relief='solid', borderwidth=1)  # 原图画布
+        self.can_src.place(x=50, y=0)
+        self.can_lic1 = Canvas(self.win, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域1画布
+        self.can_lic1.place(x=710, y=175)
+        self.can_pred1 = Canvas(self.win, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别1画布
+        self.can_pred1.place(x=710, y=300)
+        # self.can_lic1 = Canvas(self.win, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域1画布
+        # self.can_lic1.place(x=710, y=0)
+        # self.can_pred1 = Canvas(self.win, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别1画布
+        # self.can_pred1.place(x=710, y=90)
+        # self.can_lic2 = Canvas(self.win, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域2画布
+        # self.can_lic2.place(x=710, y=175)
+        # self.can_pred2 = Canvas(self.win, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别2画布
+        # self.can_pred2.place(x=710, y=265)
+        # self.can_lic3 = Canvas(self.win, width=245, height=85, bg='white', relief='solid', borderwidth=1)  # 车牌区域3画布
+        # self.can_lic3.place(x=710, y=350)
+        # self.can_pred3 = Canvas(self.win, width=245, height=65, bg='white', relief='solid', borderwidth=1)  # 车牌识别3画布
+        # self.can_pred3.place(x=710, y=440)
+
+        self.button1 = Button(self.win, text='选择文件', width=10, height=1, command=self.load_show_img)  # 选择文件按钮
+        self.button1.place(x=680, y=wh - 30)
+        self.button2 = Button(self.win, text='识别车牌', width=10, height=1, command=self.display)  # 识别车牌按钮
+        self.button2.place(x=780, y=wh - 30)
+        self.button3 = Button(self.win, text='清空所有', width=10, height=1, command=self.clear)  # 清空所有按钮
+        self.button3.place(x=880, y=wh - 30)
+        self.unet = keras.models.load_model('model/unetnew.h5')  # 蓝黄绿
+        self.cnn = keras.models.load_model('model/cnnblue57.h5')    # 暂时为蓝牌和绿牌，黄牌为颜色空间映射
         self.cnngreen = keras.models.load_model('model/cnngreen317.h5')
         self.cnnyellow = keras.models.load_model('model/cnnyellow326.h5')
         print('正在启动中,请稍等...')
         cnn_predict(self.cnn, [np.zeros((80, 240, 3))])
         cnn_predict_green(self.cnngreen, [np.zeros((80, 240, 3))])
         cnn_predict_yellow(self.cnnyellow, [np.zeros((80, 240, 3))])
-        print("已启动,开始识别！")
+        print("已启动,开始识别吧！")
 
-    def predict_func(self, img_name, orgid):
-        # 从中文路径读取时用
-        img_name = os.path.join(orgid, img_name)
-        img_src_path = os.path.join(self.img_dir, img_name)
-        print(img_src_path)
-        img_src = cv2.imdecode(np.fromfile(img_src_path, dtype=np.uint8), -1)
-        h, w = img_src.shape[0], img_src.shape[1]
+    # 显示图片
+    def cv_show(name, img):
+        cv2.imshow(name, img)
+        cv2.waitKey()
+        cv2.destroyAllWindows()
 
-        # 满足该条件说明可能整个图片就是一张车牌,无需定位,直接识别即可
-        if h * w <= 240 * 80 and 2 <= w / h <= 5:
-            # 直接resize为(240,80)
-            lic = cv2.resize(img_src, dsize=(240, 80), interpolation=cv2.INTER_AREA)[:, :, :3]
-            img_src_copy, Lic_img = img_src, [lic]
+    def load_show_img(self):
+        self.clear()
+        sv = StringVar()
+        sv.set(askopenfilename())
+        # 获取到所打开的图片
+        self.img_src_path = Entry(self.win, state='readonly', text=sv).get()
+        img_open = Image.open(self.img_src_path)
+        if img_open.size[0] * img_open.size[1] > 240 * 80:
+            img_open = img_open.resize((512, 512), Image.ANTIALIAS)
+        self.img_Tk = ImageTk.PhotoImage(img_open)
+        self.can_src.create_image(258, 258, image=self.img_Tk, anchor='center')
 
-        # 否则就需通过unet对img_src原图预测,得到img_mask,实现车牌定位,然后进行识别
+    def display(self):
+        # 还没选择图片就进行预测
+        if self.img_src_path == None:
+            self.can_pred1.create_text(32, 15, text='请选择图片', anchor='nw', font=('黑体', 28))
         else:
-            img_src, img_mask = unet_predict(self.unet, img_src_path)
-            # 利用core.py中的locate_and_correct函数进行车牌定位和矫正
-            img_src_copy, Lic_img = locate_and_correct(img_src,
-                                                       img_mask)
+            # 从中文路径读取时用
+            img_src = cv2.imdecode(np.fromfile(self.img_src_path, dtype=np.uint8), -1)
+            h, w = img_src.shape[0], img_src.shape[1]
 
-        platecolor, Lic_img = colorConversion(Lic_img)
-        if platecolor == "blue" or platecolor == "yellow" or platecolor == "green":
+            # 满足该条件说明可能整个图片就是一张车牌,无需定位,直接识别即可
+            if h * w <= 240 * 80 and 2 <= w / h <= 5:
+                # 直接resize为(240,80)
+                lic = cv2.resize(img_src, dsize=(240, 80), interpolation=cv2.INTER_AREA)[:, :, :3]
+                img_src_copy, Lic_img = img_src, [lic]
+
+            # 否则就需通过unet对img_src原图预测,得到img_mask,实现车牌定位,然后进行识别
+            else:
+                img_src, img_mask = unet_predict(self.unet, self.img_src_path)
+                # 利用core.py中的locate_and_correct函数进行车牌定位和矫正
+                img_src_copy, Lic_img = locate_and_correct(img_src,
+                                                           img_mask)
+
+            platecolor, Lic_img = colorConversion(Lic_img)
+            print(platecolor)
             if platecolor == "blue":
                 Lic_pred = cnn_predict(self.cnn, Lic_img)
             elif platecolor == "yellow":
                 Lic_pred = cnn_predict_yellow(self.cnnyellow, Lic_img)
             elif platecolor == "green":
                 Lic_pred = cnn_predict_green(self.cnngreen, Lic_img)
+                # Lic_pred = Lic_img_copy
+                # Lic_pred_true = []
+                # for i, lic_pred in enumerate(Lic_pred):
+                #     text1 = Lic_pred[i][1]
+                #     text2 = Lic_pred_copy[i][1]
+                #     lic = Lic_pred[i][0]
+                #     text = text1 + text2[-1]
+                #     Lic_pred_true.append((lic, text))
+                # Lic_pred.clear()
+                # Lic_pred = Lic_pred_true
 
+            # 利用cnn进行车牌的识别预测,Lic_pred中存的是元祖(车牌图片,识别结果)
+            # Lic_pred = cnn_predict(self.cnn, Lic_img)
             if Lic_pred:
                 # img_src_copy[:, :, ::-1]将BGR转为RGB
-                # img = Image.fromarray(img_src_copy[:, :, ::-1])
-
+                img = Image.fromarray(img_src_copy[:, :, ::-1])
+                self.img_Tk = ImageTk.PhotoImage(img)
+                # 显示前,先清空画板
+                self.can_src.delete('all')
+                # img_src_copy上绘制出了定位的车牌轮廓,将其显示在画板上
+                self.can_src.create_image(258, 258, image=self.img_Tk,
+                                          anchor='center')
                 for i, lic_pred in enumerate(Lic_pred):
                     if i == 0:
-                        net_img_path = os.path.join(self.net_img_dir, img_name)
-                        # print(net_img_path)
-                        # print(orgid)
-                        # print(platecolor)
-                        # print(lic_pred[1])
-                        handleAddCar(net_img_path, lic_pred[1], platecolor, orgid)
-                        print("======成功进入！======")
+                        print(lic_pred[1])
+                        self.lic_Tk1 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
+                        self.can_lic1.create_image(5, 5, image=self.lic_Tk1, anchor='nw')
+                        self.can_pred1.create_text(35, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
+                    # elif i == 1:
+                    #     self.lic_Tk2 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
+                    #     self.can_lic2.create_image(5, 5, image=self.lic_Tk2, anchor='nw')
+                    #     self.can_pred2.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
+                    # elif i == 2:
+                    #     self.lic_Tk3 = ImageTk.PhotoImage(Image.fromarray(lic_pred[0][:, :, ::-1]))
+                    #     self.can_lic3.create_image(5, 5, image=self.lic_Tk3, anchor='nw')
+                    #     self.can_pred3.create_text(40, 15, text=lic_pred[1], anchor='nw', font=('黑体', 28))
 
             # Lic_pred为空说明未能识别
             else:
-                print("未能识别成功！")
-        else:
-            print("车牌识别失败！")
-
-    def predict_func_leave(self, img_name, orgid):
-        # 从中文路径读取时用
-        img_name = os.path.join(orgid, img_name)
-        img_src_path = os.path.join(self.img_dir, img_name)
-        print(img_src_path)
-        img_src = cv2.imdecode(np.fromfile(img_src_path, dtype=np.uint8), -1)
-        h, w = img_src.shape[0], img_src.shape[1]
-
-        # 满足该条件说明可能整个图片就是一张车牌,无需定位,直接识别即可
-        if h * w <= 240 * 80 and 2 <= w / h <= 5:
-            # 直接resize为(240,80)
-            lic = cv2.resize(img_src, dsize=(240, 80), interpolation=cv2.INTER_AREA)[:, :, :3]
-            img_src_copy, Lic_img = img_src, [lic]
-
-        # 否则就需通过unet对img_src原图预测,得到img_mask,实现车牌定位,然后进行识别
-        else:
-            img_src, img_mask = unet_predict(self.unet, img_src_path)
-            # 利用core.py中的locate_and_correct函数进行车牌定位和矫正
-            img_src_copy, Lic_img = locate_and_correct(img_src,
-                                                       img_mask)
-
-        platecolor, Lic_img = colorConversion(Lic_img)
-        if platecolor == "blue" or platecolor == "yellow" or platecolor == "green":
-            if platecolor == "blue":
-                Lic_pred = cnn_predict(self.cnn, Lic_img)
-            elif platecolor == "yellow":
-                Lic_pred = cnn_predict_yellow(self.cnnyellow, Lic_img)
-            elif platecolor == "green":
-                Lic_pred = cnn_predict_green(self.cnngreen, Lic_img)
-
-            if Lic_pred:
-                # img_src_copy[:, :, ::-1]将BGR转为RGB
-                # img = Image.fromarray(img_src_copy[:, :, ::-1])
-
-                for i, lic_pred in enumerate(Lic_pred):
-                    if i == 0:
-                        net_img_path = os.path.join(self.net_img_dir, img_name)
-                        # print(net_img_path)
-                        # print(orgid)
-                        # print(platecolor)
-                        # print(lic_pred[1])
-                        if handleCarLeave(net_img_path, lic_pred[1], platecolor, orgid):
-                            print("======成功离开！======")
-                        else:
-                            print("======异常错误，请联系值班人员手动处理！======")
-
-            # Lic_pred为空说明未能识别
-            else:
-                print("未能识别成功！")
-        else:
-            print("车牌识别失败！")
+                self.can_pred1.create_text(47, 15, text='未能识别', anchor='nw', font=('黑体', 27))
 
     def clear(self):
-        self.img_dir = None
+        self.can_src.delete('all')
+        self.can_lic1.delete('all')
+        # self.can_lic2.delete('all')
+        # self.can_lic3.delete('all')
+        self.can_pred1.delete('all')
+        # self.can_pred2.delete('all')
+        # self.can_pred3.delete('all')
+        self.img_src_path = None
+
+    # 关闭前清除session(),防止'NoneType' object is not callable
+    def closeEvent(self):
+        keras.backend.clear_session()
+        sys.exit()
 
 
+# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    observer = Observer()
-    fileHandler = MyDirEventHandler()
-    observer.schedule(fileHandler, "/Users/travis/UniversityFiles/GraduationFiles/plateDataDir", True)
-    observer.start()
-    try:
-        while True:
-            time.sleep(2)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+    function = input("trainunet or traincnn or test: ")
+    if function == "test":
+        win = Tk()
+        ww = 1000  # 窗口宽设定1000
+        wh = 600   # 窗口高设定600
+        Window(win, ww, wh)
+
+        win.protocol("WM_DELETE_WINDOW", Window.closeEvent)
+        win.mainloop()
+    elif function == "trainunet":
+        unet_train()
+    elif function == "traincnn":
+        cnn_train()
+    else:
+        print("input error!")
+
+# See PyCharm help at https://www.jetbrains.com/help/pycharm/

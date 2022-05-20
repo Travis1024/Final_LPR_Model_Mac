@@ -4,6 +4,8 @@ import os
 import cv2
 from tensorflow.python.keras import layers, losses, models
 # from keras import layers, losses, models
+from tensorflow.python.keras.utils.vis_utils import plot_model
+
 
 def unet_train():
     height = 512
@@ -89,6 +91,7 @@ def unet_train():
                   metrics=['accuracy'])
     model.summary()
 
+    plot_model(model, to_file='model.png', show_shapes=True)
     print("开始训练u-net")
     model.fit(X_train, y_train, epochs=100, batch_size=16)#epochs和batch_size看个人情况调整，batch_size不要过大，否则内存容易溢出
     model.save('unet.h5')

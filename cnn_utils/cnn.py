@@ -32,9 +32,9 @@ def cnn_train():
     x = Input
     x = layers.Conv2D(filters=16, kernel_size=(3, 3), strides=1, padding='same', activation='relu')(x)
     x = layers.MaxPool2D(pool_size=(2, 2), padding='same', strides=2)(x)
-    for i in range(3):
-        x = layers.Conv2D(filters=32 * 2 ** i, kernel_size=(3, 3), padding='valid', activation='relu')(x)
-        x = layers.Conv2D(filters=32 * 2 ** i, kernel_size=(3, 3), padding='valid', activation='relu')(x)
+    for i in range(4):
+        x = layers.Conv2D(filters=32 * 2 ** i, kernel_size=(3, 3), padding='same', activation='relu')(x)
+        x = layers.Conv2D(filters=32 * 2 ** i, kernel_size=(3, 3), padding='same', activation='relu')(x)
         x = layers.MaxPool2D(pool_size=(2, 2), padding='same', strides=2)(x)
         x = layers.Dropout(0.5)(x)
     x = layers.Flatten()(x)
